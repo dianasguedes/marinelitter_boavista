@@ -1,0 +1,85 @@
+# Correlation and regression analysis between marine litter of the two seasons and types
+
+# Load data
+data <- read.csv2("path_to_your_file.csv")
+
+# Seasonal correlations
+cor.test(data$aug_micro, data$out_micro, method = "spearman")
+cor.test(data$aug_meso_macro, data$out_meso_macro, method = "spearman")
+cor.test(data$aug_drone, data$out_drone, method = "spearman")
+cor.test(data$aug_sand, data$out_sand, method = "spearman")
+
+# Correlations within August data
+cor.test(data$aug_micro, data$aug_meso_macro, method = "spearman")
+cor.test(data$aug_micro, data$aug_drone, method = "spearman")
+cor.test(data$aug_meso_macro, data$aug_drone, method = "spearman")
+cor.test(data$aug_sand, data$aug_drone, method = "spearman")
+
+# Correlations within October data
+cor.test(data$out_micro, data$out_meso_macro, method = "spearman")
+cor.test(data$out_micro, data$out_drone, method = "spearman")
+cor.test(data$out_meso_macro, data$out_drone, method = "spearman")
+cor.test(data$out_sand, data$out_drone, method = "spearman")
+
+# General correlations
+cor.test(data$micro, data$meso_macro, method = "spearman")
+cor.test(data$micro, data$drone_plastics, method = "spearman")
+cor.test(data$meso_macro, data$drone_plastics, method = "spearman")
+cor.test(data$sand, data$drone_plastics, method = "spearman")
+
+# Regression Analysis
+model1 <- lm(micro ~ drone_plastics, data = data)
+model2 <- lm(meso_macro ~ drone_plastics, data = data)
+model3 <- lm(sand ~ drone_plastics, data = data)
+summary(model1)
+summary(model2)
+summary(model3)
+
+
+
+# Correlation and regression analysis between marine litter of different colours
+
+# Calculate the total for each color across all stations and sizes
+color_totals <- data %>%
+  select(-station, -size) %>%
+  summarise_all(sum)
+print(color_totals)
+
+# Calculate totals by 'size' category
+size_totals <- data %>%
+  group_by(size) %>%
+  summarise(across(black:white.transp, sum))
+print(size_totals)
+
+# Reshape the data to wide format for correlation analysis
+data_wide <- data %>%
+  pivot_wider(names_from = size, values_from = c(white.transp, black, blue, pink.red, green, grey, orange), names_sep = "_") %>%
+  select(-station)
+
+# Function to calculate correlation and p-values across size classes for each color category
+correlation_across_sizes <- function(data, method = "spearman") {
+  color_categories <- c("white.transp", "black", "blue", "pink.red", "green", "grey", "orange")
+  
+  for (color in color_categories) {
+    cat("Correlation for color:", color, "\n")
+    color_data <- data %>%
+      select(starts_with(color))
+    
+    if (ncol(color_data) >= 2) {
+      for (i in 1:(ncol(color_data) - 1)) {
+        for (j in (i + 1):ncol(color_data)) {
+          cor_test <- cor.test(color_data[[i]], color_data[[j]], method = method)
+          cat("Size categories:", colnames(color_data)[i], "and", colnames(color_data)[j], "\n")
+          cat("Correlation coefficient:", cor_test$estimate, "\n")
+          cat("P-value:", cor_test$p.value, "\n\n")
+        }
+      }
+    } else {
+      cat("Not enough data for correlation analysis for color:", color, "\n")
+    }
+    cat("\n")
+  }
+}
+
+# Run the correlation analysis
+correlation_across_sizes(data_wide, method = "spearman")
