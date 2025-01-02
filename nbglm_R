@@ -1,0 +1,42 @@
+# Negative Binomial GLM for analysing the influence of environmental variables in marine debris accumulation around Boa Vista
+
+# Load necessary libraries
+library(car)
+library(MASS) 
+library(mgcv)
+
+# Load the dataset
+data <- read.csv("path_to_your_file.csv", sep = ";")
+
+# VIF calculation function
+calculate_vif <- function(vars) {
+  formula <- as.formula(paste("northness ~", paste(vars, collapse = " + ")))
+  model <- lm(formula, data = data)
+  vif(model)}
+
+# Test VIF correlation for variable combinations
+selected_vars <- data[, c("eastward", "slope", "elevation", "northward", "northness", "eastness")]
+variable_combinations <- combn(colnames(selected_vars), 2, simplify = FALSE)
+vif_results <- lapply(variable_combinations, function(vars) {
+  tryCatch({
+  list(variables = vars, vif_values = calculate_vif(vars))
+  }, error = function(e) NULL)})
+vif_results <- Filter(Negate(is.null), vif_results)
+
+# Check overdispersion (variance much larger than mean indicates overdispersion)
+mean_variance_check <- apply(data[, c("all_drone_items", "all_sand_items", "meso_macro", "micro", "fishing", "fragments", "wood", "containers")], 2, function(x) {c(mean = mean(x), variance = var(x))})
+print(mean_variance_check)
+
+# Negative Binomial GLM for multiple response variables
+response_vars <- c("all_drone_items", "all_sand_items", "meso_macro", "micro", "fishing", "fragments", "wood", "containers")
+predictors <- c("slope", "elevation", "northness", "eastward")
+
+for (response in response_vars) {
+  nb_model <- glm.nb(as.formula(paste(response, "~", paste(predictors, collapse = " + "))), data = data)
+  summary(nb_model)
+  # Calculate AIC and Pseudo-R²
+  logLik_nb <- logLik(nb_model)
+  null_model_nb <- glm.nb(as.formula(paste(response, "~ 1")), data = data)  # Null model (intercept-only)
+  logLik_null_nb <- logLik(null_model_nb)
+  pseudo_r2_nb <- 1 - (as.numeric(logLik_nb) / as.numeric(logLik_null_nb))
+  cat(paste(response, "Negative Binomial GLM Pseudo-R²: ", pseudo_r2_nb, "\n"))}
